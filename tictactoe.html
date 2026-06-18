@@ -31,6 +31,40 @@
       letter-spacing: 2px;
     }
 
+    .mode-toggle {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      margin-bottom: 1.5rem;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid #0f3460;
+      width: fit-content;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .mode-btn {
+      background: #16213e;
+      color: #a8a8b3;
+      border: none;
+      padding: 0.5rem 1.4rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      letter-spacing: 0.5px;
+    }
+
+    .mode-btn.active {
+      background: #0f3460;
+      color: #fff;
+    }
+
+    .mode-btn:hover:not(.active) {
+      background: #1a2a4a;
+      color: #ccc;
+    }
+
     .status {
       color: #a8a8b3;
       font-size: 1.1rem;
@@ -41,6 +75,10 @@
     .status span {
       color: #e94560;
       font-weight: bold;
+    }
+
+    .status span.o {
+      color: #4fc3f7;
     }
 
     .board {
@@ -73,12 +111,16 @@
       color: #4fc3f7;
     }
 
-    .cell:hover:not(.taken) {
+    .cell:hover:not(.taken):not(.blocked) {
       background: #0f3460;
       transform: scale(1.05);
     }
 
     .cell.taken {
+      cursor: not-allowed;
+    }
+
+    .cell.blocked {
       cursor: not-allowed;
     }
 
@@ -155,9 +197,14 @@
   <div class="container">
     <h1>TIC TAC TOE</h1>
 
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="btn2P">2 Pemain</button>
+      <button class="mode-btn" id="btnAI">vs AI</button>
+    </div>
+
     <div class="score-board">
       <div class="score-card x">
-        <div class="label">Pemain X</div>
+        <div class="label" id="labelX">Pemain X</div>
         <div class="value" id="scoreX">0</div>
       </div>
       <div class="score-card draw">
@@ -165,7 +212,7 @@
         <div class="value" id="scoreDraw">0</div>
       </div>
       <div class="score-card o">
-        <div class="label">Pemain O</div>
+        <div class="label" id="labelO">Pemain O</div>
         <div class="value" id="scoreO">0</div>
       </div>
     </div>
@@ -194,6 +241,10 @@
     const scoreX = document.getElementById('scoreX');
     const scoreO = document.getElementById('scoreO');
     const scoreDraw = document.getElementById('scoreDraw');
+    const labelX = document.getElementById('labelX');
+    const labelO = document.getElementById('labelO');
+    const btn2P = document.getElementById('btn2P');
+    const btnAI = document.getElementById('btnAI');
 
     const WINS = [
       [0,1,2],[3,4,5],[6,7,8],
@@ -204,28 +255,76 @@
     let board = Array(9).fill('');
     let current = 'X';
     let gameOver = false;
+    let aiThinking = false;
+    let vsAI = false;
     let scores = { X: 0, O: 0, draw: 0 };
 
-    function checkWinner() {
-      for (const [a, b, c] of WINS) {
-        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-          return { winner: board[a], line: [a, b, c] };
-        }
+    // --- Mode toggle ---
+    btn2P.addEventListener('click', () => {
+      if (vsAI) { vsAI = false; btn2P.classList.add('active'); btnAI.classList.remove('active'); updateLabels(); reset(); }
+    });
+    btnAI.addEventListener('click', () => {
+      if (!vsAI) { vsAI = true; btnAI.classList.add('active'); btn2P.classList.remove('active'); updateLabels(); reset(); }
+    });
+
+    function updateLabels() {
+      labelX.textContent = 'Pemain X';
+      labelO.textContent = vsAI ? 'AI' : 'Pemain O';
+    }
+
+    // --- Win check (works on any board array) ---
+    function checkWinnerOn(b) {
+      for (const [a, i, c] of WINS) {
+        if (b[a] && b[a] === b[i] && b[a] === b[c]) return { winner: b[a], line: [a, i, c] };
       }
-      if (board.every(c => c !== '')) return { winner: 'draw' };
+      if (b.every(v => v !== '')) return { winner: 'draw' };
       return null;
     }
 
-    function handleClick(e) {
-      const idx = +e.target.dataset.index;
-      if (gameOver || board[idx]) return;
+    // --- Minimax ---
+    function minimax(b, isMaximizing, depth) {
+      const result = checkWinnerOn(b);
+      if (result) {
+        if (result.winner === 'O') return 10 - depth;
+        if (result.winner === 'X') return depth - 10;
+        return 0;
+      }
+      if (isMaximizing) {
+        let best = -Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (!b[i]) { b[i] = 'O'; best = Math.max(best, minimax(b, false, depth + 1)); b[i] = ''; }
+        }
+        return best;
+      } else {
+        let best = Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (!b[i]) { b[i] = 'X'; best = Math.min(best, minimax(b, true, depth + 1)); b[i] = ''; }
+        }
+        return best;
+      }
+    }
 
-      board[idx] = current;
+    function getBestMove() {
+      let best = -Infinity, bestMove = -1;
+      for (let i = 0; i < 9; i++) {
+        if (!board[i]) {
+          board[i] = 'O';
+          const score = minimax(board, false, 0);
+          board[i] = '';
+          if (score > best) { best = score; bestMove = i; }
+        }
+      }
+      return bestMove;
+    }
+
+    // --- Place a mark and check result ---
+    function placeMove(idx, player) {
+      board[idx] = player;
       const cell = cells[idx];
-      cell.textContent = current;
-      cell.classList.add('taken', current.toLowerCase());
+      cell.textContent = player;
+      cell.classList.add('taken', player.toLowerCase());
 
-      const result = checkWinner();
+      const result = checkWinnerOn(board);
       if (result) {
         gameOver = true;
         if (result.winner === 'draw') {
@@ -237,23 +336,56 @@
           if (result.winner === 'X') scoreX.textContent = scores.X;
           else scoreO.textContent = scores.O;
           result.line.forEach(i => cells[i].classList.add('win'));
-          statusEl.innerHTML = `Pemain <span>${result.winner}</span> menang!`;
+          const label = vsAI && result.winner === 'O' ? 'AI' : `Pemain <span>${result.winner}</span>`;
+          statusEl.innerHTML = `${label} menang!`;
         }
-        return;
+        return true;
       }
+      return false;
+    }
 
-      current = current === 'X' ? 'O' : 'X';
-      statusEl.innerHTML = `Giliran <span>${current}</span>`;
+    // --- AI turn ---
+    function doAIMove() {
+      aiThinking = true;
+      cells.forEach(c => c.classList.add('blocked'));
+      statusEl.innerHTML = `AI sedang berpikir...`;
+
+      setTimeout(() => {
+        const move = getBestMove();
+        cells.forEach(c => c.classList.remove('blocked'));
+        aiThinking = false;
+
+        if (move === -1) return;
+        const finished = placeMove(move, 'O');
+        if (!finished) {
+          current = 'X';
+          statusEl.innerHTML = `Giliran <span>X</span>`;
+        }
+      }, 350);
+    }
+
+    // --- Human click ---
+    function handleClick(e) {
+      const idx = +e.target.dataset.index;
+      if (gameOver || aiThinking || board[idx]) return;
+
+      const finished = placeMove(idx, current);
+      if (finished) return;
+
+      if (vsAI) {
+        doAIMove();
+      } else {
+        current = current === 'X' ? 'O' : 'X';
+        statusEl.innerHTML = `Giliran <span class="${current.toLowerCase()}">${current}</span>`;
+      }
     }
 
     function reset() {
       board.fill('');
       current = 'X';
       gameOver = false;
-      cells.forEach(c => {
-        c.textContent = '';
-        c.className = 'cell';
-      });
+      aiThinking = false;
+      cells.forEach(c => { c.textContent = ''; c.className = 'cell'; });
       statusEl.innerHTML = `Giliran <span>X</span>`;
     }
 
