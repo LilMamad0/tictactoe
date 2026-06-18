@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .container {
+      text-align: center;
+    }
+
+    h1 {
+      color: #e94560;
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      letter-spacing: 2px;
+    }
+
+    .status {
+      color: #a8a8b3;
+      font-size: 1.1rem;
+      margin-bottom: 1.5rem;
+      height: 1.5rem;
+    }
+
+    .status span {
+      color: #e94560;
+      font-weight: bold;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      grid-template-rows: repeat(3, 110px);
+      gap: 8px;
+      margin: 0 auto 1.5rem;
+      width: fit-content;
+    }
+
+    .cell {
+      width: 110px;
+      height: 110px;
+      background: #16213e;
+      border: 2px solid #0f3460;
+      border-radius: 12px;
+      font-size: 3rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, transform 0.1s;
+      color: #e94560;
+      user-select: none;
+    }
+
+    .cell.o {
+      color: #4fc3f7;
+    }
+
+    .cell:hover:not(.taken) {
+      background: #0f3460;
+      transform: scale(1.05);
+    }
+
+    .cell.taken {
+      cursor: not-allowed;
+    }
+
+    .cell.win {
+      background: #0f3460;
+      border-color: #e94560;
+      animation: pulse 0.5s ease;
+    }
+
+    .cell.o.win {
+      border-color: #4fc3f7;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    .score-board {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .score-card {
+      background: #16213e;
+      border: 2px solid #0f3460;
+      border-radius: 10px;
+      padding: 0.6rem 1.2rem;
+      min-width: 80px;
+    }
+
+    .score-card .label {
+      color: #a8a8b3;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .score-card .value {
+      font-size: 1.8rem;
+      font-weight: bold;
+    }
+
+    .score-card.x .value { color: #e94560; }
+    .score-card.draw .value { color: #a8a8b3; }
+    .score-card.o .value { color: #4fc3f7; }
+
+    .btn {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 0.7rem 2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      letter-spacing: 1px;
+    }
+
+    .btn:hover {
+      background: #c73652;
+      transform: scale(1.05);
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TIC TAC TOE</h1>
+
+    <div class="score-board">
+      <div class="score-card x">
+        <div class="label">Pemain X</div>
+        <div class="value" id="scoreX">0</div>
+      </div>
+      <div class="score-card draw">
+        <div class="label">Seri</div>
+        <div class="value" id="scoreDraw">0</div>
+      </div>
+      <div class="score-card o">
+        <div class="label">Pemain O</div>
+        <div class="value" id="scoreO">0</div>
+      </div>
+    </div>
+
+    <div class="status" id="status">Giliran <span>X</span></div>
+
+    <div class="board" id="board">
+      <div class="cell" data-index="0"></div>
+      <div class="cell" data-index="1"></div>
+      <div class="cell" data-index="2"></div>
+      <div class="cell" data-index="3"></div>
+      <div class="cell" data-index="4"></div>
+      <div class="cell" data-index="5"></div>
+      <div class="cell" data-index="6"></div>
+      <div class="cell" data-index="7"></div>
+      <div class="cell" data-index="8"></div>
+    </div>
+
+    <button class="btn" id="resetBtn">Main Lagi</button>
+  </div>
+
+  <script>
+    const cells = document.querySelectorAll('.cell');
+    const statusEl = document.getElementById('status');
+    const resetBtn = document.getElementById('resetBtn');
+    const scoreX = document.getElementById('scoreX');
+    const scoreO = document.getElementById('scoreO');
+    const scoreDraw = document.getElementById('scoreDraw');
+
+    const WINS = [
+      [0,1,2],[3,4,5],[6,7,8],
+      [0,3,6],[1,4,7],[2,5,8],
+      [0,4,8],[2,4,6]
+    ];
+
+    let board = Array(9).fill('');
+    let current = 'X';
+    let gameOver = false;
+    let scores = { X: 0, O: 0, draw: 0 };
+
+    function checkWinner() {
+      for (const [a, b, c] of WINS) {
+        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+          return { winner: board[a], line: [a, b, c] };
+        }
+      }
+      if (board.every(c => c !== '')) return { winner: 'draw' };
+      return null;
+    }
+
+    function handleClick(e) {
+      const idx = +e.target.dataset.index;
+      if (gameOver || board[idx]) return;
+
+      board[idx] = current;
+      const cell = cells[idx];
+      cell.textContent = current;
+      cell.classList.add('taken', current.toLowerCase());
+
+      const result = checkWinner();
+      if (result) {
+        gameOver = true;
+        if (result.winner === 'draw') {
+          scores.draw++;
+          scoreDraw.textContent = scores.draw;
+          statusEl.innerHTML = 'Seri!';
+        } else {
+          scores[result.winner]++;
+          if (result.winner === 'X') scoreX.textContent = scores.X;
+          else scoreO.textContent = scores.O;
+          result.line.forEach(i => cells[i].classList.add('win'));
+          statusEl.innerHTML = `Pemain <span>${result.winner}</span> menang!`;
+        }
+        return;
+      }
+
+      current = current === 'X' ? 'O' : 'X';
+      statusEl.innerHTML = `Giliran <span>${current}</span>`;
+    }
+
+    function reset() {
+      board.fill('');
+      current = 'X';
+      gameOver = false;
+      cells.forEach(c => {
+        c.textContent = '';
+        c.className = 'cell';
+      });
+      statusEl.innerHTML = `Giliran <span>X</span>`;
+    }
+
+    cells.forEach(c => c.addEventListener('click', handleClick));
+    resetBtn.addEventListener('click', reset);
+  </script>
+</body>
+</html>
